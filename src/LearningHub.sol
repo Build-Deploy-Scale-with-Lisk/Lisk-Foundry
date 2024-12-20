@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import "./MyFirstContract.sol";
-contract LearningHub is MyFirstContract {
+import "./RewardToken.sol";
+contract LearningHub {
     // Define a set of badges using Enum
     enum Badge { None, Beginner, Intermediate, Advanced }
+
+       RewardToken public rewardToken;
 
     // Define a struct for a Student
     struct Student {
@@ -15,15 +17,20 @@ contract LearningHub is MyFirstContract {
 
     // Mapping from address to student details
     mapping(address => Student) public students;
+    mapping(address => uint256) public userXP;
 
     // Address of the contract owner
     address public owner;
 
+     uint256 public tokenPerLesson = 1 * 10 ** 18;
+
     // Events for transparency and logging
     event Enrolled(address indexed student, string name);
-    event CourseCompleted(address indexed student, uint256 coursesCompleted, Badge badge);
+    event CourseCompleted(address indexed student, string description, Badge badge);
     event FundsDeposited(address indexed depositor, uint256 amount);
     event FundsWithdrawn(address indexed owner, uint256 amount);
+    event TokensRewarded(address user, uint256 tokenAmount);
+    event TokensTransferred(address from, address to, uint256 tokenAmount);
 
     // Modifier to restrict access to the owner
     modifier onlyOwner() {
@@ -34,7 +41,8 @@ contract LearningHub is MyFirstContract {
     /**
      * @dev Constructor to set the owner
      */
-    constructor() {
+   constructor(RewardToken _token){
+        rewardToken = _token;
         owner = msg.sender;
     }
 
@@ -75,7 +83,9 @@ contract LearningHub is MyFirstContract {
             student.badge = Badge.Beginner;
         }
 
-        emit CourseCompleted(msg.sender, student.coursesCompleted, student.badge);
+        claimTokens();
+
+        emit CourseCompleted(msg.sender, "Just completed a course, a winner with distiction", student.badge);
     }
 
     /**
@@ -87,12 +97,24 @@ contract LearningHub is MyFirstContract {
         return (student.name, student.age, student.badge, student.coursesCompleted);
     }
 
+    function claimTokens() internal {
+        uint256 rewardAmount = tokenPerLesson;
+        rewardToken.mint(msg.sender, rewardAmount); // Mint new tokens
+        emit TokensRewarded(msg.sender, rewardAmount);
+    }
+
     /**
      * @dev Deposit funds into the contract
      */
     function FundDapp() public payable {
         require(msg.value > 0, "Deposit must be greater than zero");
         emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    function transferTokens(address recipient, uint256 amount) external {
+        require(rewardToken.balanceOf(msg.sender) >= amount, "Not enough tokens to transfer");
+        rewardToken.transfer(recipient, amount); // Transfer tokens from the sender to the recipient
+        emit TokensTransferred(msg.sender, recipient, amount);
     }
 
     /**
